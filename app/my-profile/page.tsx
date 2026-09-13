@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { getAuth } from "@/lib/auth";
 import ProfileView from "@/components/ProfileView";
 import { User } from "@/lib/types";
 
@@ -9,6 +9,7 @@ import { User } from "@/lib/types";
  * Unauthenticated visitors are redirected to /login before any render.
  */
 export default async function MyProfilePage() {
+  const auth = await getAuth();
   const session = await auth.api.getSession({ headers: await headers() });
 
   if (!session) {

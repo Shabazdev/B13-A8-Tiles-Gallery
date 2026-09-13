@@ -4,8 +4,25 @@
  * are served from /api/auth/[...all].
  */
 
-import { auth } from "@/lib/auth";
+import { getAuth } from "@/lib/auth";
 
-const handler = auth.handler;
+// Lazy-initialize the auth handler on first request
+let handlerPromise: Promise<(request: Request) => Promise<Response>> | null = null;
 
-export { handler as GET, handler as POST };
+async function getHandler() {
+  if (!handlerPromise) {
+    const auth = await getAuth();
+    handlerPromise = Promise.resolve(auth.handler);
+  }
+  return handlerPromise;
+}
+
+export async function GET(request: Request) {
+  const handler = await getHandler();
+  return handler(request);
+}
+
+export async function POST(request: Request) {
+  const handler = await getHandler();
+  return handler(request);
+}
