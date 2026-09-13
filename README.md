@@ -36,15 +36,16 @@ npm run dev                  # http://localhost:3000
 BETTER_AUTH_SECRET=<openssl rand -base64 32>
 BETTER_AUTH_URL=http://localhost:3000
 
-# Local dev → SQLite (zero setup). Production → PostgreSQL (Neon/Supabase).
-DATABASE_URL=file:./db/tesserae.db
+# MongoDB connection string
+MONGODB_URI=mongodb://localhost:27017
+MONGODB_DB_NAME=tesserae
 
 # Optional — enables "Sign in with Google" when both are set
 GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
 ```
 
-Better Auth creates its database tables automatically on first run.
+Better Auth creates its MongoDB collections automatically on first run.
 
 ### Google OAuth setup
 
@@ -92,7 +93,8 @@ For **Vercel deployment** set these env vars in the project settings:
 
 - `BETTER_AUTH_SECRET`
 - `BETTER_AUTH_URL=https://your-app.vercel.app`
-- `DATABASE_URL` (use a PostgreSQL URL — SQLite does not persist on serverless)
+- `MONGODB_URI` (use MongoDB Atlas for production)
+- `MONGODB_DB_NAME`
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`
 
 Also add `https://your-app.vercel.app/api/auth/callback/google` to your Google OAuth redirect URIs.

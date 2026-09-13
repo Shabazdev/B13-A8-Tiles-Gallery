@@ -85,4 +85,4 @@ export async function getAuth() {
 
 // Type exports
 export type AuthInstance = Awaited<ReturnType<typeof createAuth>>;
-export type Session = AuthInstance["$infer"]["Session"];
+export type Session = AuthInstance["$Infer"]["Session"];
