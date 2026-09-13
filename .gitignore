@@ -1,4 +1,4 @@
-# dependencies
+﻿# dependencies
 node_modules/
 
 # next.js
@@ -24,3 +24,4 @@ next-env.d.ts
 cookies.txt
 signin.json
 signup.json
+.vercel
