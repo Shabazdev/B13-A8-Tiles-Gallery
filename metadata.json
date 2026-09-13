@@ -1,6 +1,0 @@
-{
-  "name": "Tiles Gallery",
-  "description": "An elegant website to showcase and browse a premium collection of ceramic, marble, mosaic, and glass tiles with custom aesthetic galleries and user profiles.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
