@@ -43,16 +43,50 @@ const googleConfigured = Boolean(
   process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
 );
 
+// Normalize BETTER_AUTH_URL — trim whitespace, parse with URL() to strip
+// trailing slashes / paths, and fall back to localhost for development.
+// This prevents "Invalid origin" errors caused by malformed env values
+// (e.g. trailing space, trailing slash, or protocol-relative URLs).
+const rawAuthUrl = process.env.BETTER_AUTH_URL?.trim() ?? "";
+let betterAuthUrl: string;
+if (rawAuthUrl) {
+  try {
+    betterAuthUrl = new URL(rawAuthUrl).origin;
+  } catch {
+    betterAuthUrl = "http://localhost:3000";
+  }
+} else {
+  betterAuthUrl = "http://localhost:3000";
+}
+
+// Build the list of trusted origins.
+// Always include the configured URL and localhost so both prod and dev work.
+const trustedOrigins: string[] = [
+  betterAuthUrl,
+  "http://localhost:3000",
+];
+
+// When deployed on Vercel, VERCEL_URL is automatically set to the deployment
+// domain (e.g. "b13-a8-tiles-gallery-pi.vercel.app"). Add it as a trusted
+// origin so requests from the actual deployment URL pass origin validation
+// even if BETTER_AUTH_URL was not explicitly configured.
+if (process.env.VERCEL_URL) {
+  const vercelOrigin = `https://${process.env.VERCEL_URL}`;
+  if (!trustedOrigins.includes(vercelOrigin)) {
+    trustedOrigins.push(vercelOrigin);
+  }
+}
+
 // Create the auth instance with MongoDB adapter
 const createAuth = async () => {
   const db = await getDb();
 
   return betterAuth({
-    baseURL: process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
+    baseURL: betterAuthUrl,
     database: mongodbAdapter(db, {
       usePlural: false,
     }),
-    trustedOrigins: [process.env.BETTER_AUTH_URL ?? "http://localhost:3000"],
+    trustedOrigins,
     emailAndPassword: {
       enabled: true,
       minPasswordLength: 6,
