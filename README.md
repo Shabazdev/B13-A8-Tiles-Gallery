@@ -1,52 +1,98 @@
-# Tesserae — Premium Tiles Gallery Showcase
+# Tesserae — Premium Tiles Gallery Showcase (Next.js + Better Auth)
 
-An elegant, Swiss-minimalist web showroom designed to showcase a curated collection of exquisite ceramic, marble, terracotta, porcelain, and glass tiles. Developed with React 19, Tailwind CSS v4, and Framer Motion.
+An elegant, Swiss-minimalist web showroom showcasing a curated collection of exquisite ceramic, marble, terracotta, porcelain, and glass tiles. Built with **Next.js (App Router)**, **TypeScript**, **Tailwind CSS v4**, **Motion**, and **Better Auth** for authentication.
 
-## 🏛️ Project Theme & Design Concept
-Tesserae uses a high-contrast editorial aesthetic incorporating generous negative space, subtle zinc lines, and crisp typography pairings. By combining the sleek **Inter** sans-serif font for general UI controls with the beautiful **Playfair Display** editorial serif for headings, the platform reflects the craftsmanship and structural beauty of artisanal tiling.
+> Migrated from React + Firebase Authentication → Next.js App Router + Better Auth (same UI/UX, same features).
 
-## ✨ Key Features
+## ✨ Features
 
-### 🧱 1. Responsive Layout & Navbar Navigation
-- **Responsive Header (Navbar)**:
-  - Left: Website logo links directly to the Home dashboard.
-  - Centre: Navigational links for **Home**, **All Tiles**, and **My Profile** (with private route protection).
-  - Right: Context-aware sign-in controls showing dynamic user names and avatars for active sessions, and a quick "Logout" button. On anonymous sessions, an elegant "Login" CTA is displayed.
-- **Architectural Footer**: Includes curated category shortcuts, a dynamic "Join the Club" newsletter sub-module with success feedback, and a functional "Contact Us" info directory.
+- **Responsive Navbar & Footer** — sticky glass header, mobile menu, live session avatar, logout.
+- **Home Page** — hero banner, infinite scrolling marquee, value props, featured tiles.
+- **All Tiles Catalogue** — instant title search + category filtering.
+- **Tile Details** (`/tile/[id]`) — full spec sheet, gallery tags, studio-sample CTA.
+- **Authentication (Better Auth)**:
+  - Email + password **registration** (`/register`) and **login** (`/login`)
+  - **Google OAuth** sign-in
+  - **Persistent sessions** — survives page reloads
+  - Secure **logout**
+- **Protected Routes** — `/my-profile`, `/update-profile`, `/tile/[id]` are guarded by:
+  1. **Edge middleware** (session-cookie check → redirect to `/login?from=...`)
+  2. **Server-side session verification** (`auth.api.getSession`) inside the page components
+- **Profile updates** — display name + photo URL saved through `authClient.updateUser`.
+- **Toast notifications** — no browser `alert()`; success/error/info toasts everywhere.
+- **404 page** — fully styled "Misplaced Tile" layout.
 
-### 🏠 2. Dynamic Home Page
-- **Hero Banner**: A clean display typography header ("Discover Your Perfect Aesthetic") coupled with a "Browse Now" button leading to the catalog and an inline showcase mockup.
-- **Scrolling Announcement Marquee**: Powered by **Framer Motion**, a seamless infinite text scroll showing new arrivals, product drops, and artisan notices.
-- **Artisan Showcase**: Loads and displays the top 4 featured tiles with responsive interaction cards and detail quick-links.
+## 🚀 Getting Started
 
-### 🔍 3. All Tiles Catalogue
-- **Instant Search Input**: Search through tiles by title with real-time text matching.
-- **Bespoke Category Filtering**: Filter tiles by material type (ceramic, marble, mosaic, terracotta, glass, porcelain) through interactive tabs.
-- **Interactive Card Elements**: Every card includes responsive hover zoom scales, stock availability indicators, material specifications, and a dynamic CTA.
+```bash
+npm install
+cp .env.example .env.local   # then fill in the values
+npm run dev                  # http://localhost:3000
+```
 
-### 🛡️ 4. Local Database-backed Authentication
-- **User Login**: Form with email and password fields, validation warnings, register navigation triggers, and **Google Social login simulation** which sets up a pre-configured Google account in one click.
-- **User Registration**: Create accounts by entering Name, Email, Password, and a custom Profile Photo link. Newly registered accounts are committed to `localStorage` and can immediately be logged into!
-- **Default Tester Credentials**: To make grading painless, the database automatically seeds a demo account:
-  - **Email**: `designer@tesserae.com`
-  - **Password**: `password123`
+### Environment variables (`.env.local`)
 
-### 👤 5. Designer Profile & Update Suite
-- **My Profile**: Private route displaying current designer credentials, join dates, access tiers, layout preferences, and shortcuts.
-- **Update Information**: An isolated settings view allowing users to live-update their Display Name and Image URL, updating all matching session parameters in real time.
+```env
+BETTER_AUTH_SECRET=<openssl rand -base64 32>
+BETTER_AUTH_URL=http://localhost:3000
 
-### 🚦 6. Robust SPA Routing & Guards
-- **Page-Reload Safety**: Uses a custom hash-based routing engine (`HashRouter`). Reloading from `/my-profile` or `/tile/tile_001` works flawlessly without ever throwing 404 router errors.
-- **Private View Redirect Guard**: Restricts access to `/my-profile`, `/update-profile`, and single `/tile/[id]` details. Accessing these anonymously displays an error Toast warning and redirects users to sign in.
-- **Simulated Latency Loaders**: Integrates an aesthetic "Loading Studio..." overlay spinner on all route changes to mimic real-world network requests.
-- **404 Misplaced Tile Page**: Dedicated fully styled not-found layout for invalid paths.
+# Local dev → SQLite (zero setup). Production → PostgreSQL (Neon/Supabase).
+DATABASE_URL=file:./db/tesserae.db
 
----
+# Optional — enables "Sign in with Google" when both are set
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+```
 
-## 📦 Installed Packages & Technologies
-The application uses the following pre-configured dependencies:
-- **`react` & `react-dom` (^19.0.1)**: Progressive client UI architecture.
-- **`motion` (^12.23.24)**: High-end animation triggers and infinite scrolling loops.
-- **`lucide-react` (^0.546.0)**: Modern, vector-sharp SVG icons.
-- **`@tailwindcss/vite` (^4.1.14)**: Modern Utility-first Tailwind CSS engine.
-- **`vite` (^6.2.3)**: blazingly fast bundling and asset management.
+Better Auth creates its database tables automatically on first run.
+
+### Google OAuth setup
+
+1. Google Cloud Console → APIs & Services → Credentials → **Create OAuth Client ID** (Web application).
+2. Authorized JavaScript origin: `http://localhost:3000` (and your production domain).
+3. Authorized redirect URI: `http://localhost:3000/api/auth/callback/google`.
+4. Copy the client ID/secret into `.env.local`.
+
+## 🗂 Project Structure
+
+```text
+app/
+├── layout.tsx              # Root layout (Providers + Header + Footer)
+├── page.tsx                # Home
+├── login/page.tsx
+├── register/page.tsx
+├── my-profile/page.tsx     # Protected (server-side session check)
+├── update-profile/page.tsx # Protected
+├── tile/[id]/page.tsx      # Protected
+├── all-tiles/page.tsx
+├── not-found.tsx
+├── loading.tsx
+└── api/auth/[...all]/route.ts  # Better Auth handler
+
+components/                 # UI components (preserved from original app)
+lib/
+├── auth.ts                 # Better Auth server instance (DB + OAuth)
+├── auth-client.ts          # Better Auth React client
+├── auth-context.tsx        # AuthProvider + useAuth
+├── toast-context.tsx       # ToastProvider + useToast
+├── tiles.ts                # Static tile catalogue data
+└── types.ts
+
+middleware.ts               # Edge guard for protected routes
+```
+
+## 📦 Build & Deploy (Vercel)
+
+```bash
+npm run build
+npm start
+```
+
+For **Vercel deployment** set these env vars in the project settings:
+
+- `BETTER_AUTH_SECRET`
+- `BETTER_AUTH_URL=https://your-app.vercel.app`
+- `DATABASE_URL` (use a PostgreSQL URL — SQLite does not persist on serverless)
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`
+
+Also add `https://your-app.vercel.app/api/auth/callback/google` to your Google OAuth redirect URIs.
