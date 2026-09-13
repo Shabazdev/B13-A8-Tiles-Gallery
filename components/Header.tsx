@@ -7,15 +7,17 @@
 
 import { useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Menu, X, LogOut, Grid, User as UserIcon } from 'lucide-react';
+import { Menu, X, LogOut, Grid, User as UserIcon, ShoppingCart, ShoppingBag } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
+import { useCart } from '@/lib/cart-context';
 
 export default function Header() {
   const router = useRouter();
   const pathname = usePathname();
   const { currentUser, logout } = useAuth();
   const { showToast } = useToast();
+  const { itemCount } = useCart();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navItems = [
@@ -76,6 +78,18 @@ export default function Header() {
 
         {/* Right: Auth Action Status (Desktop) */}
         <div className="hidden md:flex items-center gap-4">
+          <button
+            onClick={() => handleNavClick('/cart')}
+            className="relative flex items-center gap-1.5 rounded-lg p-2 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 transition-colors"
+            id="nav-cart"
+          >
+            <ShoppingBag size={18} />
+            {itemCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-neutral-900 text-[10px] font-bold text-white shadow-sm">
+                {itemCount > 9 ? '9+' : itemCount}
+              </span>
+            )}
+          </button>
           {currentUser ? (
             <div className="flex items-center gap-4">
               <button
@@ -152,6 +166,23 @@ export default function Header() {
                 {item.name}
               </button>
             ))}
+
+            <button
+              onClick={() => handleNavClick('/cart')}
+              className={`text-left text-sm font-medium py-1.5 transition-colors ${
+                isActive('/cart') ? 'text-neutral-900 font-bold' : 'text-neutral-500'
+              }`}
+            >
+              <span className="flex items-center justify-start gap-2">
+                <ShoppingBag size={16} />
+                Cart
+              </span>
+              {itemCount > 0 && (
+                <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-neutral-900 text-[10px] font-bold text-white shadow-sm">
+                  {itemCount > 9 ? '9+' : itemCount}
+                </span>
+              )}
+            </button>
           </div>
 
           <hr className="border-neutral-100" />

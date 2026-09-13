@@ -8,7 +8,7 @@
 import { motion } from 'motion/react';
 
 export default function Marquee() {
-  const marqueeText = "★  NEW ARRIVALS: Handcrafted Tuscan Clay & Emerald Subway Glass  ★  WEEKLY FEATURE: Modern Hexagonal Mosaic Patterns  ★  JOIN THE ARTISAN COMMUNITY  ★  FREE STUDIO SAMPLE SWATCHES ON ALL ORDERS OVER $150  ";
+  const marqueeText = "★  NEW ARRIVALS: Handcrafted Tuscan Clay & Emerald Subway Glass  ★  WEEKLY FEATURE: Modern Hexagonal Mosaic Patterns  ★  JOIN THE ARTISAN COMMUNITY  ★  FREE SWATCHES ON ALL ORDERS OVER $150  ";
 
   return (
     <div className="relative w-full overflow-hidden bg-neutral-950 py-3 text-white border-y border-neutral-800">

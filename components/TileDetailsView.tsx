@@ -10,6 +10,7 @@ import { motion } from 'motion/react';
 import { Tile } from '@/lib/types';
 import { useToast } from '@/lib/toast-context';
 import { ArrowLeft, Tag, ShoppingCart, Info, Compass, Box, Maximize } from 'lucide-react';
+import { useCart } from '@/lib/cart-context';
 
 interface TileDetailsViewProps {
   tile: Tile;
@@ -18,10 +19,17 @@ interface TileDetailsViewProps {
 export default function TileDetailsView({ tile }: TileDetailsViewProps) {
   const router = useRouter();
   const { showToast } = useToast();
+  const { addToCart, isInCart } = useCart();
   const isOut = !tile.inStock;
+  const alreadyInCart = isInCart(tile.id);
 
   const handleAddToCart = () => {
-    showToast(`Studio sample ordered for "${tile.title}"! Check your email.`, 'success');
+    if (alreadyInCart) {
+      showToast(`"${tile.title}" is already in your cart.`, 'info');
+      return;
+    }
+    addToCart(tile);
+    showToast(`"${tile.title}" added to cart.`, 'success');
   };
 
   return (
@@ -166,18 +174,22 @@ export default function TileDetailsView({ tile }: TileDetailsViewProps) {
             <div className="flex items-start gap-3">
               <Info size={16} className="text-neutral-400 mt-0.5 flex-shrink-0" />
               <p className="text-xs text-neutral-300 leading-normal">
-                Want to evaluate the finish before committing? Order an elegant studio sample swatch shipped directly to your design desk.
+                {isOut
+                  ? 'This tile is currently unavailable. Sign up for notifications when restocked.'
+                  : alreadyInCart
+                    ? `"${tile.title}" is in your cart. Continue shopping or checkout.`
+                    : 'Add this tile to your cart and continue exploring.'}
               </p>
             </div>
             <div className="flex gap-4">
               <button
                 disabled={isOut}
                 onClick={handleAddToCart}
-                id="btn-order-sample"
+                id="btn-add-to-cart"
                 className="w-full flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-xs font-bold text-neutral-900 shadow transition-all hover:bg-neutral-100 active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <ShoppingCart size={14} />
-                {isOut ? 'Sold Out' : 'Request Studio Sample'}
+                {isOut ? 'Out of Stock' : alreadyInCart ? 'In Cart' : 'Add to Cart'}
               </button>
             </div>
           </div>
