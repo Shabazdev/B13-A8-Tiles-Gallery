@@ -4,6 +4,9 @@ import { getAuth } from "@/lib/auth";
 import ProfileView from "@/components/ProfileView";
 import { User } from "@/lib/types";
 
+// Force dynamic rendering — requires database connection
+export const dynamic = "force-dynamic";
+
 /**
  * Protected route — session is verified SERVER-SIDE.
  * Unauthenticated visitors are redirected to /login before any render.

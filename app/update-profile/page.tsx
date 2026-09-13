@@ -3,6 +3,9 @@ import { redirect } from "next/navigation";
 import { getAuth } from "@/lib/auth";
 import UpdateProfileView from "@/components/UpdateProfileView";
 
+// Force dynamic rendering — requires database connection
+export const dynamic = "force-dynamic";
+
 /**
  * Protected route — session is verified SERVER-SIDE.
  * The client component reads live session data from AuthContext so profile
