@@ -106,6 +106,7 @@ interface CartContextValue {
   removeFromCart: (tileId: string) => void;
   updateQuantity: (tileId: string, quantity: number) => void;
   clearCart: () => void;
+  isInCart: (tileId: string) => boolean;
 }
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -160,6 +161,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "CLEAR" });
   }, []);
 
+  const isInCart = useCallback(
+    (tileId: string) => state.items.some((i) => i.tile.id === tileId),
+    [state.items]
+  );
+
   const total = state.items.reduce((sum, i) => sum + i.tile.price * i.quantity, 0);
   const itemCount = state.items.reduce((sum, i) => sum + i.quantity, 0);
 
@@ -174,6 +180,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         removeFromCart,
         updateQuantity,
         clearCart,
+        isInCart,
       }}
     >
       {children}

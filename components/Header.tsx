@@ -7,7 +7,7 @@
 
 import { useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Menu, X, LogOut, Grid, User as UserIcon, ShoppingCart, ShoppingBag } from 'lucide-react';
+import { Menu, X, LogOut, Grid, User as UserIcon, ShoppingBag } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 import { useCart } from '@/lib/cart-context';

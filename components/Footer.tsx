@@ -7,7 +7,7 @@
 
 import { useState, FormEvent } from 'react';
 import Link from 'next/link';
-import { Mail, Phone, MapPin, Send, Instagram, Twitter, MessageSquare, Shield } from 'lucide-react';
+import { Mail, Phone, MapPin, Send, Instagram, Twitter, MessageSquare, Shield, ShoppingCart } from 'lucide-react';
 
 export default function Footer() {
   const [email, setEmail] = useState('');
@@ -44,6 +44,9 @@ export default function Footer() {
               </a>
               <a href="#chat" className="p-2 rounded-lg bg-neutral-800/60 hover:bg-neutral-800 hover:text-white transition-all text-neutral-400">
                 <MessageSquare size={15} />
+              </a>
+              <a href="#cart" className="p-2 rounded-lg bg-neutral-800/60 hover:bg-neutral-800 hover:text-white transition-all text-neutral-400">
+                <ShoppingCart size={15} />
               </a>
             </div>
           </div>
