@@ -68,6 +68,7 @@ export function parseAuthError(error: AuthErrorShape | null | undefined): string
       return "We could not process your request right now. Please try again.";
     case "SOCIAL_PROVIDER_MISSING":
     case "PROVIDER_DISABLED":
+    case "PROVIDER_NOT_FOUND":
       return "Google sign-in is not configured on the server yet.";
     default:
       return error.message || "An unexpected error occurred. Please try again.";

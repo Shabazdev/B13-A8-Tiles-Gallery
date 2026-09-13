@@ -48,6 +48,7 @@ const createAuth = async () => {
   const db = await getDb();
 
   return betterAuth({
+    baseURL: process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
     database: mongodbAdapter(db, {
       usePlural: false,
     }),
