@@ -16,7 +16,14 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className="min-h-screen flex flex-col bg-stone-50 font-sans text-neutral-800">
+      {/* suppressHydrationWarning: browser extensions (e.g. Demoway) inject
+          attributes like data-demoway-document-id into <body> before React
+          hydrates. This suppresses only attribute/child mismatches on <body>
+          itself — it does not mask hydration errors elsewhere in the tree. */}
+      <body
+        className="min-h-screen flex flex-col bg-stone-50 font-sans text-neutral-800"
+        suppressHydrationWarning
+      >
         <Providers>
           <Header />
           <main className="flex-1">
