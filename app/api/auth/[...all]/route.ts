@@ -5,6 +5,11 @@
  */
 
 import { getAuth } from "@/lib/auth";
+import tls from "node:tls";
+
+// Configure default ECDH curve to prime256v1 to bypass ESET SSL/TLS protocol filtering
+// issues with post-quantum ciphers/curves (such as Kyber X25519Kyber768Draft00)
+tls.DEFAULT_ECDH_CURVE = "prime256v1";
 
 // Lazy-initialize the auth handler on first request
 let handlerPromise: Promise<(request: Request) => Promise<Response>> | null = null;
@@ -46,6 +51,20 @@ function authErrorResponse(code: string, message: string): Response {
 async function handle(request: Request): Promise<Response> {
   let handler: (request: Request) => Promise<Response>;
 
+  const url = new URL(request.url);
+  if (url.pathname.includes("/api/auth/callback/google")) {
+    console.log("[auth-debug] Google OAuth Callback request received:", {
+      url: request.url,
+      method: request.method,
+      searchParams: Object.fromEntries(url.searchParams.entries()),
+      headers: {
+        host: request.headers.get("host"),
+        referer: request.headers.get("referer"),
+        "user-agent": request.headers.get("user-agent"),
+      },
+    });
+  }
+
   try {
     handler = await getHandler();
   } catch (error) {
@@ -61,7 +80,13 @@ async function handle(request: Request): Promise<Response> {
   }
 
   try {
-    return await handler(request);
+    const response = await handler(request);
+    if (url.pathname.includes("/api/auth/callback/google")) {
+      console.log("[auth-debug] Google OAuth Callback handler returned status:", response.status, {
+        headers: Object.fromEntries(response.headers.entries()),
+      });
+    }
+    return response;
   } catch (error) {
     // Better Auth returns error Responses for expected failures, so a throw
     // here means something genuinely unexpected. Log the detail but return a
