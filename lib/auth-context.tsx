@@ -70,8 +70,20 @@ export function parseAuthError(error: AuthErrorShape | null | undefined): string
     case "PROVIDER_DISABLED":
     case "PROVIDER_NOT_FOUND":
       return "Google sign-in is not configured on the server yet.";
+    case "SERVER_CONFIG_ERROR":
+      // Thrown by app/api/auth/[...all]/route.ts when the auth instance
+      // cannot start (e.g. MONGODB_URI is missing). Surface the server's
+      // own message — it names the exact variable that needs fixing.
+      return (
+        error.message ??
+        "The authentication service is not configured on the server. Check its environment variables."
+      );
     default:
-      return error.message || "An unexpected error occurred. Please try again.";
+      if (error.message) return error.message;
+      if (error.status && error.status >= 500) {
+        return "The authentication service is unavailable. Please try again in a moment.";
+      }
+      return "An unexpected error occurred. Please try again.";
   }
 }
 
