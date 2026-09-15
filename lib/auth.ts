@@ -29,11 +29,25 @@ async function getDb(): Promise<Db> {
   let client: MongoClient;
   if (process.env.NODE_ENV === "development") {
     if (!global._mongoClientPromise) {
-      global._mongoClientPromise = new MongoClient(MONGODB_URI).connect();
+      global._mongoClientPromise = new MongoClient(MONGODB_URI, {
+        // Fail fast instead of the driver's 30s default: a hanging auth
+        // request is aborted client-side and surfaces only as the generic
+        // "Failed to fetch" TypeError. A fast failure returns parseable JSON.
+        serverSelectionTimeoutMS: 8000,
+      }).connect();
+      // A rejected promise must not stay cached: otherwise a transient DB
+      // outage permanently breaks auth until the dev server restarts.
+      // Reset on failure so the next request retries the connection.
+      global._mongoClientPromise.catch(() => {
+        global._mongoClientPromise = undefined;
+      });
     }
     client = await global._mongoClientPromise;
   } else {
-    client = await new MongoClient(MONGODB_URI).connect();
+    client = await new MongoClient(MONGODB_URI, {
+      // Same fail-fast rationale as the development branch above.
+      serverSelectionTimeoutMS: 8000,
+    }).connect();
   }
 
   return client.db(MONGODB_DB_NAME);
