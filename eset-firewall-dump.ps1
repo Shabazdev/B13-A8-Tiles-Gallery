@@ -1,1 +1,0 @@
-﻿Get-ChildItem "HKLM:\SOFTWARE\ESET\ESET Security\CurrentVersion\Plugins\01000200" -ErrorAction SilentlyContinue -Recurse -Depth 3 | ForEach-Object { Write-Host "KEY:" $_.Name -ForegroundColor Cyan; $p = Get-ItemProperty $_.PSPath -ErrorAction SilentlyContinue; if ($p) { $p | Format-List | Out-String } }; Write-Host "---DONE---"
