@@ -126,11 +126,20 @@ if (rawAuthUrl) {
   }
 }
 if (!betterAuthUrl) {
-  // Never silently fall back to localhost outside development: a localhost
-  // base URL makes Better Auth drop the Secure flag from its cookies and tells
-  // Google to redirect to http://localhost:3000/api/auth/callback/google.
+  // Vercel injects VERCEL_PROJECT_PRODUCTION_URL (= the stable production
+  // domain, e.g. "b13-a8-tiles-gallery-pi.vercel.app") in production
+  // deployments. It MUST be preferred over VERCEL_URL: VERCEL_URL is the
+  // random per-deployment domain (e.g. "...-fv3zrgm0q-....vercel.app"), and
+  // building the Google redirect_uri on that generates a
+  // redirect_uri_mismatch because no per-deployment URI can ever be
+  // registered in Google Cloud Console.
+  const productionUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
   const vercelUrl = process.env.VERCEL_URL?.trim();
-  betterAuthUrl = vercelUrl ? `https://${vercelUrl}` : "http://localhost:3000";
+  betterAuthUrl = productionUrl
+    ? `https://${productionUrl}`
+    : vercelUrl
+      ? `https://${vercelUrl}`
+      : "http://localhost:3000";
 }
 
 // Origins allowed to call the auth API. An explicit list is deliberate: the
