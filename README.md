@@ -50,9 +50,13 @@ Better Auth creates its MongoDB collections automatically on first run.
 ### Google OAuth setup
 
 1. Google Cloud Console → APIs & Services → Credentials → **Create OAuth Client ID** (Web application).
-2. Authorized JavaScript origin: `http://localhost:3000` (and your production domain).
-3. Authorized redirect URI: `http://localhost:3000/api/auth/callback/google`.
-4. Copy the client ID/secret into `.env.local`.
+2. Authorized JavaScript origins:
+   - `http://localhost:3000` (local development)
+   - `https://b13-a8-tiles-gallery-pi.vercel.app` (production)
+3. Authorized redirect URIs:
+   - `http://localhost:3000/api/auth/callback/google` (local development)
+   - `https://b13-a8-tiles-gallery-pi.vercel.app/api/auth/callback/google` (production)
+4. Copy the client ID/secret into `.env.local` and set them in **both Production and Preview** on Vercel.
 
 ## 🗂 Project Structure
 
@@ -92,9 +96,9 @@ npm start
 For **Vercel deployment** set these env vars in the project settings:
 
 - `BETTER_AUTH_SECRET`
-- `BETTER_AUTH_URL=https://your-app.vercel.app`
+- `BETTER_AUTH_URL=https://b13-a8-tiles-gallery-pi.vercel.app`
 - `MONGODB_URI` (use MongoDB Atlas for production)
 - `MONGODB_DB_NAME`
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`
 
-Also add `https://your-app.vercel.app/api/auth/callback/google` to your Google OAuth redirect URIs.
+Also add `https://b13-a8-tiles-gallery-pi.vercel.app/api/auth/callback/google` to your Google OAuth redirect URIs.
