@@ -78,6 +78,14 @@ export function parseAuthError(error: AuthErrorShape | null | undefined): string
         error.message ??
         "The authentication service is not configured on the server. Check its environment variables."
       );
+    case "DATABASE_UNAVAILABLE":
+      // The server could not reach MongoDB. Its message names the URI / Atlas
+      // Network Access setting to check, so the user never sees the generic
+      // "An unexpected error occurred" text for an outage.
+      return (
+        error.message ??
+        "We can't reach the authentication database right now, so signing in is unavailable. Please try again in a moment."
+      );
     default:
       if (error.message) return error.message;
       if (error.status && error.status >= 500) {

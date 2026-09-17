@@ -5,11 +5,6 @@
  */
 
 import { getAuth } from "@/lib/auth";
-import tls from "node:tls";
-
-// Configure default ECDH curve to prime256v1 to bypass ESET SSL/TLS protocol filtering
-// issues with post-quantum ciphers/curves (such as Kyber X25519Kyber768Draft00)
-tls.DEFAULT_ECDH_CURVE = "prime256v1";
 
 // Lazy-initialize the auth handler on first request
 let handlerPromise: Promise<(request: Request) => Promise<Response>> | null = null;
@@ -36,9 +31,30 @@ async function getHandler() {
  * shape, so `parseAuthError()` in lib/auth-context.tsx can map it to a
  * precise, human-readable message.
  */
-function authErrorResponse(code: string, message: string): Response {
-  return Response.json({ code, message, status: 500 }, { status: 500 });
+function authErrorResponse(code: string, message: string, status = 500): Response {
+  return Response.json({ code, message, status }, { status });
 }
+
+/**
+ * Is this a database connectivity failure?
+ *
+ * These are the one class of error the operator can act on, and they used to
+ * look identical to "something went wrong" in the UI. Covers the driver's
+ * named errors (MongoServerSelectionError, MongoNetworkError…) and the
+ * transport-level text they carry: SRV lookup failure, refused connection, or
+ * a TLS alert from the cluster endpoint.
+ */
+function isDatabaseError(error: unknown): boolean {
+  const name = (error as { name?: string } | null)?.name ?? "";
+  if (/^Mongo/i.test(name)) return true;
+  const message = error instanceof Error ? error.message : String(error);
+  return /server selection|querySrv|getaddrinfo|ECONNREFUSED|ENOTFOUND|alert number 80|tlsv1 alert/i.test(
+    message
+  );
+}
+
+const DATABASE_HINT =
+  "The authentication database is unreachable from the server. Check MONGODB_URI and MONGODB_DB_NAME, and make sure this server's IP address is allowed in MongoDB Atlas (Network Access).";
 
 /**
  * Single entry point for GET/POST. Initialisation *and* handler failures are
@@ -51,26 +67,15 @@ function authErrorResponse(code: string, message: string): Response {
 async function handle(request: Request): Promise<Response> {
   let handler: (request: Request) => Promise<Response>;
 
-  const url = new URL(request.url);
-  if (url.pathname.includes("/api/auth/callback/google")) {
-    console.log("[auth-debug] Google OAuth Callback request received:", {
-      url: request.url,
-      method: request.method,
-      searchParams: Object.fromEntries(url.searchParams.entries()),
-      headers: {
-        host: request.headers.get("host"),
-        referer: request.headers.get("referer"),
-        "user-agent": request.headers.get("user-agent"),
-      },
-    });
-  }
-
   try {
     handler = await getHandler();
   } catch (error) {
     // The auth instance could not be built. In practice this is always a
     // configuration problem, so the message is safe (and useful) to expose.
     console.error("[auth] Failed to initialise:", error);
+    if (isDatabaseError(error)) {
+      return authErrorResponse("DATABASE_UNAVAILABLE", DATABASE_HINT, 503);
+    }
     return authErrorResponse(
       "SERVER_CONFIG_ERROR",
       error instanceof Error && error.message
@@ -80,18 +85,15 @@ async function handle(request: Request): Promise<Response> {
   }
 
   try {
-    const response = await handler(request);
-    if (url.pathname.includes("/api/auth/callback/google")) {
-      console.log("[auth-debug] Google OAuth Callback handler returned status:", response.status, {
-        headers: Object.fromEntries(response.headers.entries()),
-      });
-    }
-    return response;
+    return await handler(request);
   } catch (error) {
     // Better Auth returns error Responses for expected failures, so a throw
-    // here means something genuinely unexpected. Log the detail but return a
-    // generic message rather than leaking internals to the browser.
+    // here means something genuinely unexpected. Log the detail but answer with
+    // something the operator can act on rather than leaking internals.
     console.error("[auth] Handler threw:", error);
+    if (isDatabaseError(error)) {
+      return authErrorResponse("DATABASE_UNAVAILABLE", DATABASE_HINT, 503);
+    }
     return authErrorResponse(
       "SERVER_ERROR",
       "Something went wrong while processing that request. Please try again."

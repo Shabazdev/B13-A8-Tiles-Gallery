@@ -3,180 +3,83 @@
  * Replaces Firebase Authentication entirely.
  *
  * Database: MongoDB (via @better-auth/mongo-adapter).
- * Connection is cached across hot-reloads in dev to avoid exhausting connections.
+ *
+ * The MongoClient is cached for the lifetime of the process — in development
+ * *and* in production. The production branch used to build a brand new
+ * MongoClient per request and never close it, which leaks a connection pool on
+ * every auth call and eventually exhausts the cluster's connection limit.
  */
 
 import { MongoClient, Db } from "mongodb";
 import { mongodbAdapter } from "@better-auth/mongo-adapter";
 import { betterAuth } from "better-auth";
-import tls from "node:tls";
 
-// Configure default ECDH curve to prime256v1 to bypass ESET SSL/TLS protocol filtering
-// issues with post-quantum ciphers/curves (such as Kyber X25519Kyber768Draft00)
-tls.DEFAULT_ECDH_CURVE = "prime256v1";
+const MONGODB_URI = process.env.MONGODB_URI?.trim();
+const MONGODB_DB_NAME = (process.env.MONGODB_DB_NAME ?? "tesserae").trim();
 
-const MONGODB_URI = process.env.MONGODB_URI;
-const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME ?? "tesserae";
+/**
+ * Configuration is validated up front and reported explicitly.
+ *
+ * Both of these previously failed *silently*, and both produce the same
+ * useless symptom in the browser ("An unexpected error occurred. Please try
+ * again.") because the client has no `code`/`message` to read:
+ *
+ *  1. A missing MONGODB_URI used to fall back to an in-memory fake database.
+ *     Registration looked like it worked, but every user and session was
+ *     discarded when the process ended (on Vercel: immediately), and once
+ *     Better Auth touched a Mongo method the fake did not implement it crashed
+ *     with an empty-bodied 500.
+ *  2. A missing BETTER_AUTH_SECRET makes Better Auth generate a random secret
+ *     per process, so every session cookie becomes unverifiable on the next
+ *     request / cold start — users are signed out at random.
+ *
+ * Throwing here lets app/api/auth/[...all]/route.ts answer with parseable
+ * JSON that names the exact variable to fix.
+ */
+function assertConfig(): void {
+  const problems: string[] = [];
+  if (!MONGODB_URI) problems.push("MONGODB_URI");
+  if (!process.env.BETTER_AUTH_SECRET?.trim()) problems.push("BETTER_AUTH_SECRET");
 
-class MockCollection {
-  name: string;
-  data: any[] = [];
-
-  constructor(name: string) {
-    this.name = name;
-  }
-
-  async findOne(query: any) {
-    const item = this.data.find(item => this.match(item, query));
-    return item ? JSON.parse(JSON.stringify(item)) : null;
-  }
-
-  async insertOne(doc: any) {
-    const newDoc = JSON.parse(JSON.stringify(doc));
-    if (!newDoc._id && !newDoc.id) {
-      newDoc._id = Math.random().toString(36).substring(2);
-    }
-    this.data.push(newDoc);
-    return { acknowledged: true, insertedId: newDoc._id || newDoc.id };
-  }
-
-  async updateOne(query: any, update: any, options?: any) {
-    const item = this.data.find(item => this.match(item, query));
-    if (item) {
-      const set = update.$set || update;
-      Object.assign(item, JSON.parse(JSON.stringify(set)));
-      return { acknowledged: true, matchedCount: 1, modifiedCount: 1 };
-    }
-    if (options?.upsert) {
-      const set = update.$set || update;
-      const newDoc = { ...query, ...JSON.parse(JSON.stringify(set)) };
-      if (!newDoc._id && !newDoc.id) {
-        newDoc._id = Math.random().toString(36).substring(2);
-      }
-      this.data.push(newDoc);
-      return { acknowledged: true, matchedCount: 0, modifiedCount: 0, upsertedId: newDoc._id || newDoc.id };
-    }
-    return { acknowledged: true, matchedCount: 0, modifiedCount: 0 };
-  }
-
-  async deleteOne(query: any) {
-    const index = this.data.findIndex(item => this.match(item, query));
-    if (index !== -1) {
-      this.data.splice(index, 1);
-      return { acknowledged: true, deletedCount: 1 };
-    }
-    return { acknowledged: true, deletedCount: 0 };
-  }
-
-  async deleteMany(query: any) {
-    const initialLength = this.data.length;
-    this.data = this.data.filter(item => !this.match(item, query));
-    return { acknowledged: true, deletedCount: initialLength - this.data.length };
-  }
-
-  find(query: any) {
-    const filtered = this.data.filter(item => this.match(item, query));
-    const results = JSON.parse(JSON.stringify(filtered));
-    return {
-      toArray: async () => results,
-      limit: function() { return this; },
-      sort: function() { return this; }
-    };
-  }
-
-  async createIndex() {
-    return "mock-index";
-  }
-
-  async dropIndex() {
-    return true;
-  }
-
-  private match(item: any, query: any): boolean {
-    for (const key in query) {
-      const queryVal = query[key];
-      const itemVal = item[key];
-      if (typeof queryVal === 'object' && queryVal !== null) {
-        if ('$in' in queryVal) {
-          if (!Array.isArray(queryVal.$in) || !queryVal.$in.includes(itemVal)) {
-            return false;
-          }
-        } else {
-          if (JSON.stringify(itemVal) !== JSON.stringify(queryVal)) {
-            return false;
-          }
-        }
-      } else {
-        if (itemVal !== queryVal) {
-          return false;
-        }
-      }
-    }
-    return true;
+  if (problems.length > 0) {
+    throw new Error(
+      `Authentication is not configured: ${problems.join(" and ")} ${
+        problems.length > 1 ? "are" : "is"
+      } missing on the server. Set ${
+        problems.length > 1 ? "them" : "it"
+      } in the deployment's environment variables (e.g. Vercel → Project → Settings → Environment Variables) and redeploy.`
+    );
   }
 }
 
-class MockDb {
-  collections: Record<string, MockCollection> = {};
-
-  collection(name: string) {
-    if (!this.collections[name]) {
-      this.collections[name] = new MockCollection(name);
-    }
-    return this.collections[name];
-  }
-}
-
-// Cache the connection across hot-reloads in development
+// Cache the connection across hot-reloads and across requests in one runtime.
 declare global {
   // eslint-disable-next-line no-var
   var _mongoClientPromise: Promise<MongoClient> | undefined;
-  // eslint-disable-next-line no-var
-  var _mockDb: MockDb | undefined;
 }
 
 async function getDb(): Promise<Db> {
-  if (!MONGODB_URI) {
-    console.warn("[AI Studio] MONGODB_URI is not set. Falling back to in-memory MockDb.");
-    if (!global._mockDb) {
-      global._mockDb = new MockDb();
-    }
-    return global._mockDb as unknown as Db;
+  assertConfig();
+
+  if (!global._mongoClientPromise) {
+    const client = new MongoClient(MONGODB_URI as string, {
+      // Fail fast instead of the driver's 30s default: a hanging auth request
+      // is aborted client-side and surfaces only as the generic
+      // "Failed to fetch" TypeError. A fast failure returns parseable JSON.
+      serverSelectionTimeoutMS: 8000,
+    });
+    const promise = client.connect();
+    // A rejected promise must not stay cached: otherwise a transient DB
+    // outage permanently breaks auth until the process restarts.
+    // Reset on failure so the next request retries the connection.
+    promise.catch(() => {
+      global._mongoClientPromise = undefined;
+    });
+    global._mongoClientPromise = promise;
   }
 
-  try {
-    let client: MongoClient;
-    if (process.env.NODE_ENV === "development") {
-      if (!global._mongoClientPromise) {
-        global._mongoClientPromise = new MongoClient(MONGODB_URI, {
-          // Fail fast instead of the driver's 30s default: a hanging auth
-          // request is aborted client-side and surfaces only as the generic
-          // "Failed to fetch" TypeError. A fast failure returns parseable JSON.
-          serverSelectionTimeoutMS: 4000,
-        }).connect();
-        // A rejected promise must not stay cached: otherwise a transient DB
-        // outage permanently breaks auth until the dev server restarts.
-        // Reset on failure so the next request retries the connection.
-        global._mongoClientPromise.catch(() => {
-          global._mongoClientPromise = undefined;
-        });
-      }
-      client = await global._mongoClientPromise;
-    } else {
-      client = await new MongoClient(MONGODB_URI, {
-        // Same fail-fast rationale as the development branch above.
-        serverSelectionTimeoutMS: 4000,
-      }).connect();
-    }
-
-    return client.db(MONGODB_DB_NAME);
-  } catch (error) {
-    console.warn("[AI Studio] Failed to connect to MongoDB. Falling back to in-memory MockDb.", error);
-    if (!global._mockDb) {
-      global._mockDb = new MockDb();
-    }
-    return global._mockDb as unknown as Db;
-  }
+  const client = await global._mongoClientPromise;
+  return client.db(MONGODB_DB_NAME);
 }
 
 const googleConfigured = Boolean(
@@ -184,43 +87,37 @@ const googleConfigured = Boolean(
 );
 
 // Normalize BETTER_AUTH_URL — trim whitespace, parse with URL() to strip
-// trailing slashes / paths, and fall back to localhost for development.
-// This prevents "Invalid origin" errors caused by malformed env values
-// (e.g. trailing space, trailing slash, or protocol-relative URLs).
+// trailing slashes / paths. This prevents "Invalid origin" errors caused by
+// malformed env values (trailing space, trailing slash, protocol-relative).
 const rawAuthUrl = process.env.BETTER_AUTH_URL?.trim() ?? "";
-let betterAuthUrl: string;
-if (process.env.NODE_ENV === "development") {
-  // During local development, force the base URL to localhost:3000 so the
-  // redirect URI generated for Google is exactly http://localhost:3000/api/auth/callback/google
-  betterAuthUrl = "http://localhost:3000";
-} else if (rawAuthUrl) {
+let betterAuthUrl = "";
+if (rawAuthUrl) {
   try {
     betterAuthUrl = new URL(rawAuthUrl).origin;
   } catch {
-    betterAuthUrl = "http://localhost:3000";
+    betterAuthUrl = "";
   }
-} else {
-  betterAuthUrl = "http://localhost:3000";
+}
+if (!betterAuthUrl) {
+  // Never silently fall back to localhost outside development: a localhost
+  // base URL makes Better Auth drop the Secure flag from its cookies and tells
+  // Google to redirect to http://localhost:3000/api/auth/callback/google.
+  const vercelUrl = process.env.VERCEL_URL?.trim();
+  betterAuthUrl = vercelUrl ? `https://${vercelUrl}` : "http://localhost:3000";
 }
 
-// Build the list of trusted origins.
-// Always include the configured URL and localhost so both prod and dev work.
+// Origins allowed to call the auth API. An explicit list is deliberate: the
+// previous "https://*.vercel.app" wildcard trusted every Vercel-hosted site,
+// which defeats origin validation.
 const trustedOrigins: string[] = [
   betterAuthUrl,
   "http://localhost:3000",
-  "https://*.run.app",
-  "https://*.asia-east1.run.app",
-  "https://*.us-central1.run.app",
-  "https://*.europe-west1.run.app",
-  "https://*.vercel.app",
-  "https://*.gitpod.io",
-  "https://*.github.dev",
+  "http://127.0.0.1:3000",
 ];
 
-// When deployed on Vercel, VERCEL_URL is automatically set to the deployment
-// domain (e.g. "b13-a8-tiles-gallery-pi.vercel.app"). Add it as a trusted
-// origin so requests from the actual deployment URL pass origin validation
-// even if BETTER_AUTH_URL was not explicitly configured.
+// When deployed on Vercel, VERCEL_URL is the deployment domain (e.g.
+// "b13-a8-tiles-gallery-pi.vercel.app"). Trust it too so preview deployments
+// work even when BETTER_AUTH_URL points at the production domain.
 if (process.env.VERCEL_URL) {
   const vercelOrigin = `https://${process.env.VERCEL_URL}`;
   if (!trustedOrigins.includes(vercelOrigin)) {
@@ -228,17 +125,26 @@ if (process.env.VERCEL_URL) {
   }
 }
 
-// Create the auth instance with MongoDB adapter
+// Create the auth instance with the MongoDB adapter.
 const createAuth = async () => {
   const db = await getDb();
 
   return betterAuth({
+    // Session cookies are signed with this secret. Without an explicit value
+    // Better Auth generates a random per-process secret, so sessions issued by
+    // one instance (or before a restart) cannot be verified by the next one.
+    secret: process.env.BETTER_AUTH_SECRET,
     baseURL: betterAuthUrl,
     database: mongodbAdapter(db, {
+      // Keeps the collection names in the singular (user, session, account,
+      // verification) — the shape the existing data was written with.
       usePlural: false,
     }),
     trustedOrigins,
     advanced: {
+      // Behind Vercel's proxy the request host/protocol arrive in the
+      // x-forwarded-* headers; trusting them is what makes the generated
+      // redirect URIs and cookie flags match the public URL.
       trustedProxyHeaders: true,
     },
     emailAndPassword: {
