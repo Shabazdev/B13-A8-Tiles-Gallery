@@ -7,9 +7,10 @@
 
 import { useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
+import { useState } from 'react';
 import { Tile } from '@/lib/types';
 import { useToast } from '@/lib/toast-context';
-import { ArrowLeft, Tag, ShoppingCart, Info, Compass, Box, Maximize } from 'lucide-react';
+import { ArrowLeft, Tag, ShoppingCart, Info, Compass, Box, Maximize, Minus, Plus } from 'lucide-react';
 import { useCart } from '@/lib/cart-context';
 
 interface TileDetailsViewProps {
@@ -19,17 +20,31 @@ interface TileDetailsViewProps {
 export default function TileDetailsView({ tile }: TileDetailsViewProps) {
   const router = useRouter();
   const { showToast } = useToast();
-  const { addToCart, isInCart } = useCart();
+  const { addToCart, isInCart, updateQuantity, items } = useCart();
   const isOut = !tile.inStock;
   const alreadyInCart = isInCart(tile.id);
 
+  const [quantity, setQuantity] = useState(1);
+
+  const cartItem = items.find((i) => i.tile.id === tile.id);
+  const currentCartQty = cartItem ? cartItem.quantity : 0;
+
   const handleAddToCart = () => {
-    if (alreadyInCart) {
-      showToast(`"${tile.title}" is already in your cart.`, 'info');
-      return;
+    if (isOut) return;
+    const safeQty = Math.min(Math.max(quantity, 1), 99);
+    if (currentCartQty > 0) {
+      updateQuantity(tile.id, Math.min(currentCartQty + safeQty, 99));
+      showToast(`Added ${safeQty} × "${tile.title}" to your cart.`, 'success');
+    } else {
+      addToCart(tile, safeQty);
+      showToast(`"${tile.title}" (${safeQty} ×) added to cart.`, 'success');
     }
-    addToCart(tile);
-    showToast(`"${tile.title}" added to cart.`, 'success');
+    setQuantity(1);
+    router.push('/cart');
+  };
+
+  const handleQtyChange = (delta: number) => {
+    setQuantity((prev) => Math.min(99, Math.max(1, prev + delta)));
   };
 
   return (
@@ -177,10 +192,39 @@ export default function TileDetailsView({ tile }: TileDetailsViewProps) {
                 {isOut
                   ? 'This tile is currently unavailable. Sign up for notifications when restocked.'
                   : alreadyInCart
-                    ? `"${tile.title}" is in your cart. Continue shopping or checkout.`
-                    : 'Add this tile to your cart and continue exploring.'}
+                    ? `"${tile.title}" is in your cart (${currentCartQty} x). Add more or review your cart.`
+                    : 'Select a quantity and add this tile to your cart.'}
               </p>
             </div>
+            {!isOut && (
+              <div className="flex items-center gap-3">
+                <span className="text-[11px] font-bold uppercase tracking-widest text-neutral-400">Qty</span>
+                <div className="flex items-center rounded-xl bg-white/10 border border-white/15 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => handleQtyChange(-1)}
+                    disabled={quantity <= 1}
+                    aria-label="Decrease quantity"
+                    className="flex h-9 w-9 items-center justify-center text-neutral-200 transition-colors hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Minus size={14} />
+                  </button>
+                  <span className="w-10 text-center text-sm font-bold tabular-nums">{quantity}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleQtyChange(1)}
+                    disabled={quantity >= 99}
+                    aria-label="Increase quantity"
+                    className="flex h-9 w-9 items-center justify-center text-neutral-200 transition-colors hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Plus size={14} />
+                  </button>
+                </div>
+                <span className="text-xs text-neutral-400">
+                  {'$'}{(tile.price * quantity).toFixed(2)} total
+                </span>
+              </div>
+            )}
             <div className="flex gap-4">
               <button
                 disabled={isOut}
@@ -189,7 +233,7 @@ export default function TileDetailsView({ tile }: TileDetailsViewProps) {
                 className="w-full flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-xs font-bold text-neutral-900 shadow transition-all hover:bg-neutral-100 active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <ShoppingCart size={14} />
-                {isOut ? 'Out of Stock' : alreadyInCart ? 'In Cart' : 'Add to Cart'}
+                {isOut ? 'Out of Stock' : alreadyInCart ? `Add ${quantity} More to Cart` : `Add ${quantity} to Cart`}
               </button>
             </div>
           </div>

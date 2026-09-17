@@ -116,19 +116,30 @@ const CART_STORAGE_KEY = "tesserae-cart";
 export function CartProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(cartReducer, { items: [], isLoaded: false });
 
-  // Hydrate from localStorage on mount (client-only)
+  // Hydrate from localStorage on mount (client-only).
+  // Always mark loaded so empty carts persist and stop showing spinners.
   useEffect(() => {
     try {
       const raw = typeof window !== "undefined" ? window.localStorage.getItem(CART_STORAGE_KEY) : null;
       if (raw) {
         const parsed = JSON.parse(raw) as CartItem[];
         if (Array.isArray(parsed)) {
-          dispatch({ type: "SET_ITEMS", payload: parsed });
+          const valid = parsed.filter(
+            (i) =>
+              i &&
+              typeof i.quantity === "number" &&
+              i.tile &&
+              typeof i.tile.id === "string" &&
+              typeof i.tile.price === "number"
+          );
+          dispatch({ type: "SET_ITEMS", payload: valid });
+          return;
         }
       }
     } catch {
       // ignore corrupt storage
     }
+    dispatch({ type: "SET_ITEMS", payload: [] });
   }, []);
 
   // Persist to localStorage whenever items change (and are loaded)
