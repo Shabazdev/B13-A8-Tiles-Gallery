@@ -52,6 +52,24 @@ function assertConfig(): void {
   }
 }
 
+/**
+ * A credential-free description of the configured database target — e.g.
+ * "cluster0.kdl1dya.mongodb.net (db: TilesGallery)".
+ *
+ * A refused handshake cannot say *which* cluster or database name the process
+ * was trying to reach, and those are exactly the two things an operator needs
+ * to rule out when auth reports DATABASE_UNAVAILABLE. Logging the resolved
+ * target makes the deployment log answer that on its own, without ever printing
+ * the password (or the rest of the connection string).
+ */
+function describeDbTarget(): string {
+  if (!MONGODB_URI) return "(MONGODB_URI is not set)";
+  const host =
+    /^mongodb(?:\+srv)?:\/\/(?:[^@/]*@)?([^/?,]+)/i.exec(MONGODB_URI)?.[1] ??
+    "(unparsable host)";
+  return `${host} (db: ${MONGODB_DB_NAME})`;
+}
+
 // Cache the connection across hot-reloads and across requests in one runtime.
 declare global {
   // eslint-disable-next-line no-var
@@ -72,8 +90,17 @@ async function getDb(): Promise<Db> {
     // A rejected promise must not stay cached: otherwise a transient DB
     // outage permanently breaks auth until the process restarts.
     // Reset on failure so the next request retries the connection.
-    promise.catch(() => {
+    promise.catch((error) => {
       global._mongoClientPromise = undefined;
+      // Say *which* cluster/database this process tried to reach. A handshake
+      // the cluster aborts before sending its certificate (Atlas answers
+      // "alert number 80" for an IP that is not on the project's IP Access
+      // List) cannot report the target itself, so without this the log does not
+      // separate a blocked IP from a stale MONGODB_URI or a paused cluster.
+      console.error(
+        `[auth] MongoDB connection failed for ${describeDbTarget()}:`,
+        error
+      );
     });
     global._mongoClientPromise = promise;
   }
