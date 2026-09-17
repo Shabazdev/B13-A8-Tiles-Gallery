@@ -25,3 +25,39 @@ export interface User {
   photoUrl: string;
   isGoogleUser?: boolean;
 }
+
+export interface ShippingInfo {
+  fullName: string;
+  phone: string;
+  address: string;
+  city: string;
+  postalCode: string;
+  country: string;
+}
+
+export interface OrderItem {
+  productId: string;
+  title: string;
+  image: string;
+  unitPrice: number;
+  quantity: number;
+  itemSubtotal: number;
+}
+
+export type OrderStatus = "pending" | "confirmed" | "cancelled";
+export type PaymentStatus = "unpaid" | "paid" | "failed";
+
+export interface Order {
+  _id?: string;
+  orderId: string;
+  userId: string;
+  userEmail: string;
+  items: OrderItem[];
+  subtotal: number;
+  shippingCost: number;
+  total: number;
+  shipping: ShippingInfo;
+  paymentStatus: PaymentStatus;
+  orderStatus: OrderStatus;
+  createdAt: string;
+}

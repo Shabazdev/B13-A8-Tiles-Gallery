@@ -26,7 +26,7 @@ export default function CartPage() {
     useCart();
 
   const handleCheckout = () => {
-    showToast('Checkout is coming soon. Your cart has been saved locally.', 'info');
+    router.push('/checkout');
   };
 
   // Hydration guard: cart is restored from localStorage on mount.
